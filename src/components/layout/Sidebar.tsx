@@ -1,6 +1,6 @@
 import { BookOpen, CalendarCheck, GraduationCap, LayoutDashboard, LogOut, ShieldCheck, Users } from 'lucide-react';
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useStaff } from '@/context/StaffContext';
 import { useToast } from '@/components/ui/Toast';
@@ -16,12 +16,14 @@ export function Sidebar() {
   const { signOut } = useAuth();
   const { profile } = useStaff();
   const toast = useToast();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   async function handleSignOut() {
     setBusy(true);
     try {
       await signOut();
+      navigate('/login', { replace: true });
     } catch {
       toast.notify('error', 'Could not sign out. Please try again.');
       setBusy(false);
