@@ -1,0 +1,43 @@
+/*
+ * Design tokens — the single source of truth for colour, radius, spacing and type.
+ * Palette follows the reference: soft lavender canvas, white cards, violet→pink accent,
+ * and near-black pill buttons for primary actions.
+ */
+:root {
+  --bg: #eeeef5;
+  --surface: #ffffff;
+  --surface-2: #f6f6fb;
+  --line: #e8e8f1;
+
+  --text: #1b1c24;
+  --muted: #6b6d82;
+  --faint: #a2a4b8;
+
+  --accent: #5b4bff;
+  --accent-2: #b35cff;
+  --accent-soft: #eeebff;
+  --accent-grad: linear-gradient(135deg, #5b4bff 0%, #b35cff 100%);
+  --hero-grad: linear-gradient(160deg, #ece7fb 0%, #cfc3f4 100%);
+
+  --ink: #22242c;
+  --ink-hover: #343744;
+
+  --success: #22a559;
+  --success-soft: #e5f6ec;
+  --danger: #e5484d;
+  --danger-soft: #fdecec;
+  --warn: #c98a05;
+  --warn-soft: #fff4d9;
+
+  --radius-xl: 28px;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(35, 30, 80, 0.04), 0 8px 24px rgba(35, 30, 80, 0.04);
+  --shadow-pop: 0 24px 60px rgba(35, 30, 80, 0.22);
+
+  --font: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --sidebar-w: 236px;
+}

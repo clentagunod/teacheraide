@@ -1,0 +1,304 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function staffPath(schoolId, uid) {
+      return /databases/$(database)/documents/schools/$(schoolId)/staff/$(uid);
+    }
+    function profile(schoolId) {
+      return get(staffPath(schoolId, request.auth.uid)).data;
+    }
+    function isAdmin(schoolId) {
+      return signedIn()
+        && exists(staffPath(schoolId, request.auth.uid))
+        && profile(schoolId).role == 'admin';
+    }
+    function isSupervisor(schoolId) {
+      return signedIn()
+        && exists(staffPath(schoolId, request.auth.uid))
+        && profile(schoolId).role == 'supervisor';
+    }
+    function canManageSchoolData(schoolId) {
+      return isAdmin(schoolId) || isSupervisor(schoolId);
+    }
+    function isTeacher(schoolId) {
+      return signedIn()
+        && exists(staffPath(schoolId, request.auth.uid))
+        && profile(schoolId).role == 'teacher';
+    }
+    function teacherSection(schoolId, sectionId) {
+      return isTeacher(schoolId) && profile(schoolId).sectionId == sectionId;
+    }
+    function teacherArea(schoolId, subjectId) {
+      return isTeacher(schoolId)
+        && profile(schoolId).get('subjectId', profile(schoolId).get('learningArea', null)) == subjectId;
+    }
+    function text(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+    function isoDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+    function stamped(data) {
+      return data.updatedAt == request.time;
+    }
+    function createdNow(data) {
+      return data.createdAt == request.time;
+    }
+    function createdKept() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+    function sectionPath(schoolId, sectionId) {
+      return /databases/$(database)/documents/schools/$(schoolId)/sections/$(sectionId);
+    }
+    function subjectPath(schoolId, subjectId) {
+      return /databases/$(database)/documents/schools/$(schoolId)/subjects/$(subjectId);
+    }
+    function validClass(schoolId, data) {
+      return text(data.sectionId, 1, 120)
+        && exists(sectionPath(schoolId, data.sectionId))
+        && get(sectionPath(schoolId, data.sectionId)).data.grade == data.grade
+        && get(sectionPath(schoolId, data.sectionId)).data.name == data.section;
+    }
+    function validLearner(schoolId, data) {
+      return data.keys().hasOnly(['firstName', 'middleInitial', 'lastName', 'gender', 'grade', 'section', 'sectionId', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['firstName', 'lastName', 'gender', 'grade', 'section', 'sectionId', 'createdAt', 'updatedAt'])
+        && text(data.firstName, 1, 40)
+        && data.get('middleInitial', '') is string
+        && data.get('middleInitial', '').size() <= 4
+        && text(data.lastName, 1, 40)
+        && data.gender in ['female', 'male']
+        && data.grade is int && data.grade >= 1 && data.grade <= 12
+        && text(data.section, 1, 30)
+        && validClass(schoolId, data)
+        && stamped(data);
+    }
+    function validTask(schoolId, data) {
+      return data.keys().hasOnly(['subjectId', 'title', 'description', 'createdBy', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['subjectId', 'title', 'description', 'createdAt', 'updatedAt'])
+        && text(data.subjectId, 1, 128)
+        && exists(subjectPath(schoolId, data.subjectId))
+        && get(subjectPath(schoolId, data.subjectId)).data.get('active', true) == true
+        && text(data.title, 1, 80)
+        && text(data.description, 0, 300)
+        && data.get('createdBy', '') is string
+        && data.get('createdBy', '').size() <= 128
+        && data.get('active', true) is bool
+        && stamped(data);
+    }
+    function learnerPath(schoolId, learnerId) {
+      return /databases/$(database)/documents/schools/$(schoolId)/learners/$(learnerId);
+    }
+    function taskPath(schoolId, taskId) {
+      return /databases/$(database)/documents/schools/$(schoolId)/tasks/$(taskId);
+    }
+    function validAssignment(schoolId, data) {
+      return data.keys().hasOnly(['learnerId', 'taskId', 'subjectId', 'grade', 'section', 'sectionId', 'dueDate', 'dueTime', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['learnerId', 'taskId', 'subjectId', 'grade', 'section', 'sectionId', 'dueDate', 'status', 'createdAt', 'updatedAt'])
+        && text(data.learnerId, 1, 128)
+        && text(data.taskId, 1, 128)
+        && text(data.subjectId, 1, 128)
+        && exists(subjectPath(schoolId, data.subjectId))
+        && get(subjectPath(schoolId, data.subjectId)).data.get('active', true) == true
+        && data.grade is int && data.grade >= 1 && data.grade <= 12
+        && text(data.section, 1, 30)
+        && text(data.sectionId, 1, 120)
+        && exists(learnerPath(schoolId, data.learnerId))
+        && get(learnerPath(schoolId, data.learnerId)).data.sectionId == data.sectionId
+        && get(learnerPath(schoolId, data.learnerId)).data.grade == data.grade
+        && get(learnerPath(schoolId, data.learnerId)).data.section == data.section
+        && exists(taskPath(schoolId, data.taskId))
+        && get(taskPath(schoolId, data.taskId)).data.subjectId == data.subjectId
+        && isoDate(data.dueDate)
+        && data.get('dueTime', '23:59') is string
+        && data.get('dueTime', '23:59').matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && data.status in ['pending', 'completed']
+        && stamped(data);
+    }
+    function validAssignmentFields(schoolId, data) {
+      return data.keys().hasOnly(['learnerId', 'taskId', 'subjectId', 'grade', 'section', 'sectionId', 'dueDate', 'dueTime', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['learnerId', 'taskId', 'subjectId', 'grade', 'section', 'sectionId', 'dueDate', 'status', 'createdAt', 'updatedAt'])
+        && text(data.learnerId, 1, 128)
+        && text(data.taskId, 1, 128)
+        && text(data.subjectId, 1, 128)
+        && exists(subjectPath(schoolId, data.subjectId))
+        && get(subjectPath(schoolId, data.subjectId)).data.get('active', true) == true
+        && data.grade is int && data.grade >= 1 && data.grade <= 12
+        && text(data.section, 1, 30)
+        && text(data.sectionId, 1, 120)
+        && isoDate(data.dueDate)
+        && data.get('dueTime', '23:59') is string
+        && data.get('dueTime', '23:59').matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && data.status in ['pending', 'completed']
+        && stamped(data);
+    }
+    function validAttendance(schoolId, data) {
+      return data.keys().hasOnly(['date', 'grade', 'section', 'sectionId', 'records', 'updatedAt'])
+        && data.keys().hasAll(['date', 'grade', 'section', 'sectionId', 'records', 'updatedAt'])
+        && isoDate(data.date)
+        && data.grade is int && data.grade >= 1 && data.grade <= 12
+        && text(data.section, 1, 30)
+        && validClass(schoolId, data)
+        && data.records is map && data.records.size() <= 500
+        && stamped(data);
+    }
+    function validNewStaffProfile(schoolId, data) {
+      return data.keys().hasOnly(['email', 'displayName', 'role', 'grade', 'sectionId', 'section', 'subjectId', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['email', 'displayName', 'role', 'grade', 'sectionId', 'section', 'subjectId', 'createdAt', 'updatedAt'])
+        && text(data.email, 3, 254)
+        && text(data.displayName, 1, 80)
+        && data.role in ['teacher', 'supervisor']
+        && createdNow(data)
+        && stamped(data)
+        && ((data.role == 'teacher'
+          && data.grade is int && data.grade >= 1 && data.grade <= 12
+            && text(data.sectionId, 1, 120)
+            && text(data.section, 1, 30)
+            && validClass(schoolId, data)
+            && text(data.subjectId, 1, 128)
+            && exists(subjectPath(schoolId, data.subjectId))
+            && get(subjectPath(schoolId, data.subjectId)).data.get('active', true) == true)
+          || (data.role == 'supervisor'
+            && data.grade == null && data.sectionId == null && data.section == null && data.subjectId == null));
+    }
+
+    match /schools/{schoolId}/staff/{uid} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (isAdmin(schoolId)
+          || (signedIn() && request.auth.uid == uid)
+          || (isSupervisor(schoolId) && resource.data.get('subjectId', null) is string));
+      allow create: if schoolId == 'teacher-aide'
+        && isAdmin(schoolId)
+        && validNewStaffProfile(schoolId, request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /schools/{schoolId}/subjects/{subjectId} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || teacherArea(schoolId, resource.data.subjectId));
+      allow create: if schoolId == 'teacher-aide' && canManageSchoolData(schoolId)
+        && request.resource.data.keys().hasOnly(['subjectId', 'name', 'color', 'active', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['subjectId', 'name', 'color', 'active', 'createdAt', 'updatedAt'])
+        && request.resource.data.subjectId == subjectId
+        && text(request.resource.data.name, 1, 40)
+        && request.resource.data.color in ['violet', 'blue', 'pink', 'teal', 'amber', 'rose']
+        && request.resource.data.active == true
+        && createdNow(request.resource.data)
+        && stamped(request.resource.data);
+      allow update: if false;
+      allow delete: if schoolId == 'teacher-aide' && canManageSchoolData(schoolId);
+    }
+
+    match /schools/{schoolId}/settings/{settingId} {
+      allow get, list: if schoolId == 'teacher-aide' && isAdmin(schoolId);
+      allow create: if schoolId == 'teacher-aide' && isAdmin(schoolId)
+        && settingId == 'catalog'
+        && request.resource.data.keys().hasOnly(['initialized', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['initialized', 'createdAt', 'updatedAt'])
+        && request.resource.data.initialized == true
+        && createdNow(request.resource.data)
+        && stamped(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /schools/{schoolId}/sections/{sectionId} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || teacherSection(schoolId, resource.data.sectionId));
+      allow create: if schoolId == 'teacher-aide' && canManageSchoolData(schoolId)
+        && request.resource.data.keys().hasOnly(['sectionId', 'grade', 'name', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['sectionId', 'grade', 'name', 'createdAt', 'updatedAt'])
+        && request.resource.data.sectionId == sectionId
+        && request.resource.data.grade is int && request.resource.data.grade >= 1 && request.resource.data.grade <= 12
+        && text(request.resource.data.name, 1, 30)
+        && createdNow(request.resource.data) && stamped(request.resource.data);
+      allow update: if schoolId == 'teacher-aide' && canManageSchoolData(schoolId)
+        && request.resource.data.keys().hasOnly(['sectionId', 'grade', 'name', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['sectionId', 'grade', 'name', 'createdAt', 'updatedAt'])
+        && request.resource.data.sectionId == sectionId
+        && request.resource.data.grade is int && request.resource.data.grade >= 1 && request.resource.data.grade <= 12
+        && text(request.resource.data.name, 1, 30)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && stamped(request.resource.data);
+      allow delete: if schoolId == 'teacher-aide' && canManageSchoolData(schoolId);
+    }
+
+    match /schools/{schoolId}/learners/{learnerId} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || teacherSection(schoolId, resource.data.sectionId));
+      allow create: if schoolId == 'teacher-aide'
+        && validLearner(schoolId, request.resource.data)
+        && createdNow(request.resource.data)
+        && (canManageSchoolData(schoolId) || teacherSection(schoolId, request.resource.data.sectionId));
+      allow update: if schoolId == 'teacher-aide'
+        && validLearner(schoolId, request.resource.data)
+        && createdKept()
+        && (canManageSchoolData(schoolId) || (teacherSection(schoolId, resource.data.sectionId)
+          && request.resource.data.sectionId == resource.data.sectionId));
+      allow delete: if schoolId == 'teacher-aide' && canManageSchoolData(schoolId);
+    }
+
+    match /schools/{schoolId}/tasks/{taskId} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || teacherArea(schoolId, resource.data.subjectId));
+      allow create: if schoolId == 'teacher-aide'
+        && validTask(schoolId, request.resource.data)
+        && createdNow(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.get('active', true) == true
+        && (canManageSchoolData(schoolId) || teacherArea(schoolId, request.resource.data.subjectId));
+      allow update: if schoolId == 'teacher-aide'
+        && validTask(schoolId, request.resource.data)
+        && createdKept()
+        && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+        && request.resource.data.subjectId == resource.data.subjectId
+        && (canManageSchoolData(schoolId)
+          || (teacherArea(schoolId, resource.data.subjectId)
+            && (request.resource.data.get('active', true) == resource.data.get('active', true)
+              || (resource.data.get('createdBy', '') == request.auth.uid
+                && request.resource.data.get('active', true) == false))));
+      allow delete: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId)
+          || (isTeacher(schoolId)
+            && resource.data.get('createdBy', '') == request.auth.uid
+            && teacherArea(schoolId, resource.data.subjectId)));
+    }
+
+    match /schools/{schoolId}/assignments/{assignmentId} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || (teacherSection(schoolId, resource.data.sectionId)
+          && teacherArea(schoolId, resource.data.subjectId)));
+      allow create: if schoolId == 'teacher-aide'
+        && assignmentId == request.resource.data.learnerId + '_' + request.resource.data.taskId
+        && get(taskPath(schoolId, request.resource.data.taskId)).data.get('active', true) == true
+        && validAssignment(schoolId, request.resource.data)
+        && createdNow(request.resource.data)
+        && (canManageSchoolData(schoolId) || (teacherSection(schoolId, request.resource.data.sectionId)
+          && teacherArea(schoolId, request.resource.data.subjectId)));
+      allow update: if schoolId == 'teacher-aide'
+        && createdKept()
+        && request.resource.data.learnerId == resource.data.learnerId
+        && (canManageSchoolData(schoolId)
+          ? validAssignmentFields(schoolId, request.resource.data)
+          : (validAssignment(schoolId, request.resource.data) && request.resource.data.sectionId == resource.data.sectionId
+          && teacherSection(schoolId, resource.data.sectionId)
+          && teacherArea(schoolId, resource.data.subjectId)
+          && teacherArea(schoolId, request.resource.data.subjectId)));
+      allow delete: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || (teacherSection(schoolId, resource.data.sectionId)
+          && teacherArea(schoolId, resource.data.subjectId)));
+    }
+
+    match /schools/{schoolId}/attendance/{attendanceId} {
+      allow get, list: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || teacherSection(schoolId, resource.data.sectionId));
+      allow create, update: if schoolId == 'teacher-aide'
+        && validAttendance(schoolId, request.resource.data)
+        && (canManageSchoolData(schoolId) || teacherSection(schoolId, request.resource.data.sectionId));
+      allow delete: if schoolId == 'teacher-aide'
+        && (canManageSchoolData(schoolId) || teacherSection(schoolId, resource.data.sectionId));
+    }
+  }
+}
