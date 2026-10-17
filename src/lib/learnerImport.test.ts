@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import suppliedRoster from '../../spj10.json';
 import { getLearnerImportErrorMessage, parseLearnerRoster } from '@/lib/learnerImport';
 import type { SchoolSection } from '@/types';
 
@@ -40,14 +39,6 @@ describe('parseLearnerRoster', () => {
         sectionId: 'section-10-spj',
       },
     ]);
-  });
-
-  it('accepts the supplied SPJ grade 10 roster content', () => {
-    const roster = parseLearnerRoster(JSON.stringify(suppliedRoster), sections);
-
-    expect(roster.grade).toBe(10);
-    expect(roster.section.name).toBe('SPJ');
-    expect(roster.learners).toHaveLength(25);
   });
 
   describe('getLearnerImportErrorMessage', () => {

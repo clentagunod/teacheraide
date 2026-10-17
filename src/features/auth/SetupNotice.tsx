@@ -23,12 +23,11 @@ export function SetupNotice({ missing = [], error }: { missing?: readonly string
 
 function AccountSetupNotice({ error }: { error?: string }) {
   const { user } = useAuth();
-  const needsProvisioning = Boolean(user && !error);
 
   return (
     <div className="fatal">
       <div className="fatal__card">
-        {needsProvisioning ? (
+        {user && !error ? (
           <>
             <h1>Account setup required</h1>
             <p>This account does not have a Teacher.aide staff profile yet.</p>
