@@ -1,7 +1,7 @@
 export function TrademarkFooter() {
   return (
     <footer className="trademark-footer">
-      <span>@ 2026 Teacher.aide</span>
+      <span>© 2026 Teacher.aide</span>
       <span className="trademark-footer__separator" aria-hidden="true">•</span>
       <span>
         Courtesy of{' '}

@@ -123,6 +123,10 @@ firebase deploy --only hosting,firestore
 
 After deploying, in **Authentication → Settings → Authorized domains**, make sure your hosting domain is listed (Firebase adds `*.web.app` and `*.firebaseapp.com` automatically; add a custom domain if you use one).
 
+### Vercel
+
+`vercel.json` rewrites page requests to `index.html`, allowing React Router routes such as `/attendance` to load when opened directly or refreshed. Redeploy the project on Vercel after adding or changing this configuration.
+
 ---
 
 ## 5. Security measures
@@ -196,6 +200,7 @@ firestore.rules    database security rules
 firestore.indexes.json indexes for teacher-scoped queries
 apps-script/       Apps Script audit service (Google Sheets)
 firebase.json      hosting + security headers + rules wiring
+vercel.json       Vercel SPA route rewrites
 ```
 
 Rule of thumb: **pages never call Firestore directly**; they call `services/`. Calculations (overdue, summaries, trends) live in `lib/analytics.ts` as pure functions with unit tests.
